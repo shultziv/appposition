@@ -31,7 +31,7 @@ func TestApptica_GetAppPositionsByDays(t *testing.T) {
 	apiUrl = ts.URL
 
 	var appId uint32 = 1421444
-	var countryId uint8 = 1
+	var countryId uint32 = 1
 	dateStr := "2021-06-01"
 	date, _ := time.Parse("2006-01-02", dateStr)
 

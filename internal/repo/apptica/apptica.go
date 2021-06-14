@@ -16,6 +16,9 @@ import (
 var (
 	apiUrl  = "https://api.apptica.com"
 	timeout = time.Duration(10) * time.Second
+
+	// Колличество дней за которые доступны данные
+	countLastDaysWhenDataAvailable = 30
 )
 
 // Репозиторий для работы с api apptica
@@ -35,7 +38,19 @@ func New(apiKey string) *Apptica {
 }
 
 // Получает данные о рейтингах заданного(appId) приложения в опрделенной стране(countryId) по заданному интервалу времени (дни)
-func (a *Apptica) GetAppPositionsByDays(ctx context.Context, appId uint32, countryId uint8, dateFrom time.Time, dateTo time.Time) (appPositions []*domain.AppPosition, err error) {
+func (a *Apptica) GetAppPositionsByDays(ctx context.Context, appId uint32, countryId uint32, dateFrom time.Time, dateTo time.Time) (appPositions []*domain.AppPosition, err error) {
+	validDateBefore := time.Now()
+	validDateAfter := validDateBefore.AddDate(0, 0, -countLastDaysWhenDataAvailable)
+
+	// Вмещаются ли даты в достпуный период для API
+	if dateTo.Before(validDateAfter) || dateTo.After(validDateBefore) || dateFrom.Before(validDateAfter) || dateFrom.After(validDateBefore) {
+		return nil, ErrInvalidDateRange{
+			DateFrom: dateFrom,
+			DateTo:   dateTo,
+		}
+	}
+
+	// Вадидны ли даты до и после между собой
 	if dateTo.Before(dateFrom) {
 		return nil, ErrInvalidDateRange{
 			DateFrom: dateFrom,

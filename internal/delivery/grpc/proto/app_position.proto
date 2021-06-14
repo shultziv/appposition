@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package grpc;
+
+option go_package = "github.com/shultziv/appposition/internal/delivery/grpc/proto";
+
+service AppPosition {
+    rpc AppTopCategory(Date) returns (CategoryToMaxPosition) {}
+}
+
+message Date {
+    string date = 1;
+}
+
+message CategoryToMaxPosition {
+    map<uint32, uint32> categoryToMaxPosition = 1;
+}

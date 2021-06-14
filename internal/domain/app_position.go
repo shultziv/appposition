@@ -4,9 +4,9 @@ import "time"
 
 type AppPosition struct {
 	AppId         uint32
-	CountryId     uint8
-	CategoryId    uint8
-	SubCategoryId uint8
+	CountryId     uint32
+	CategoryId    uint32
+	SubCategoryId uint32
 	Date          time.Time
-	Position      uint8
+	Position      uint32
 }

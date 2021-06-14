@@ -6,31 +6,41 @@ import (
 	"time"
 )
 
-type appRatingRepo interface {
-	GetAppPositionsByDays(ctx context.Context, appId uint32, countryId uint8, dateFrom time.Time, dateTo time.Time) (appPositions []*domain.AppPosition, err error)
+//go:generate mockgen -destination=mocks/mock_app_rating_repo.go -package=mocks . AppRatingRepo
+type AppRatingRepo interface {
+	GetAppPositionsByDays(ctx context.Context, appId uint32, countryId uint32, dateFrom time.Time, dateTo time.Time) (appPositions []*domain.AppPosition, err error)
 }
 
-type appRatingDbRepo interface {
-	GetMaxPosAppByDays(ctx context.Context, appId uint32, countryId uint8, dateFrom time.Time, dateTo time.Time) (categoryIdToMaxPos map[uint8]uint8, err error)
+//go:generate mockgen -destination=mocks/mock_app_rating_db_repo.go -package=mocks . AppRatingDbRepo
+type AppRatingDbRepo interface {
+	GetMaxPosAppByDays(ctx context.Context, appId uint32, countryId uint32, dateFrom time.Time, dateTo time.Time) (categoryIdToMaxPos map[uint32]uint32, err error)
 	AddAppPositions(ctx context.Context, appPositions []*domain.AppPosition) (err error)
 }
 
 type AppPosition struct {
-	appRatingRepo   appRatingRepo
-	appRatingDbRepo appRatingDbRepo
+	appRatingRepo   AppRatingRepo
+	appRatingDbRepo AppRatingDbRepo
 }
 
-func New(appRatingRepo appRatingRepo, appRatingDbRepo appRatingDbRepo) *AppPosition {
+func New(appRatingRepo AppRatingRepo, appRatingDbRepo AppRatingDbRepo) *AppPosition {
 	return &AppPosition{
 		appRatingRepo:   appRatingRepo,
 		appRatingDbRepo: appRatingDbRepo,
 	}
 }
 
-func (ap *AppPosition) GetMaxPosAppInRecentDays(ctx context.Context, appId uint32, countryId uint8, countRecentDays uint32) (categoryIdToMaxPos map[uint8]uint8, err error) {
-	dateTo := time.Now()
-	dateFrom := dateTo.AddDate(0, 0, int(-countRecentDays))
+func calcMaxPosApp(appPositions []*domain.AppPosition) (categoryIdToMaxPos map[uint32]uint32) {
+	categoryIdToMaxPos = make(map[uint32]uint32)
+	for _, appPosition := range appPositions {
+		if appPosition.Position < categoryIdToMaxPos[appPosition.CategoryId] || categoryIdToMaxPos[appPosition.CategoryId] == 0 {
+			categoryIdToMaxPos[appPosition.CategoryId] = appPosition.Position
+		}
+	}
 
+	return categoryIdToMaxPos
+}
+
+func (ap *AppPosition) GetMaxPosAppInRangeDays(ctx context.Context, appId uint32, countryId uint32, dateFrom time.Time, dateTo time.Time) (categoryIdToMaxPos map[uint32]uint32, err error) {
 	// Сходили в БД, если все ок (данные есть за нужные дни), то отдаем результат
 	categoryIdToMaxPos, err = ap.appRatingDbRepo.GetMaxPosAppByDays(ctx, appId, countryId, dateFrom, dateTo)
 	if err == nil {
@@ -44,13 +54,14 @@ func (ap *AppPosition) GetMaxPosAppInRecentDays(ctx context.Context, appId uint3
 		return nil, ErrCouldNotGetData
 	}
 
+	// Кладем в БД ответ через горутину, чтобы не задерживать ответ
 	go func(ctx context.Context, appPositions []*domain.AppPosition) {
 		if err := ap.appRatingDbRepo.AddAppPositions(ctx, appPositions); err != nil {
 			// Если даные не сохранятся в БД - не критично, самое главное нам как-то об этом узнать
 			// Просто залогируем
 			// TODO: log
 		}
-	}(ctx, appPositions)
+	}(context.Background(), appPositions)
 
-	return
+	return calcMaxPosApp(appPositions), nil
 }
