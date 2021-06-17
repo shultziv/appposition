@@ -31,14 +31,14 @@ func (a *AppRatingPg) GetMaxPosAppByDays(ctx context.Context, appId uint32, coun
 					$3 
 					AND 
 					$4 
+				AND
+					app_id = $1 
+				AND 
+					country_id = $2
 			GROUP BY 
 				app_id, 
 				country_id, 
-				category_id 
-			HAVING 
-				app_id = $1 
-				AND 
-				country_id = $2;`, appId, countryId, dateFrom, dateTo)
+				category_id;`, appId, countryId, dateFrom, dateTo)
 	if err != nil {
 		return nil, err
 	}
